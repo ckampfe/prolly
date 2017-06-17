@@ -5,7 +5,10 @@ defmodule Prolly.BloomFilter do
   Use a Bloom filter when you want to keep track of whether
   you have seen a given value or not.
 
-  A Bloom filter can tell you two things:
+  For example, the quesetion "have I seen the string `foo` so far in the stream?"
+  is a reasonble question for a Bloom filter.
+
+  Specifically, a Bloom filter can tell you two things:
   1. When a value *may* be in a set.
   2. When a value is definitely not in a set
 

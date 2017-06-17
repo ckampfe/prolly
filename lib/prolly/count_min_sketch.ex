@@ -2,8 +2,11 @@ defmodule Prolly.CountMinSketch do
   require Vector
 
   @moduledoc """
-  Use CountMinSketch when you want to count the approximate occurences of values
-  in a stream using sublinear memory
+  Use CountMinSketch when you want to count and query the
+  approximate number of occurences of values in a stream using sublinear memory
+
+  For example, "how many times has the string `foo` been in the stream so far?" is
+  a reasonable question for CountMinSketch.
 
   A CountMinSketch will not undercount occurences, but may overcount occurences,
   reporting a count that is higher than the real number of occurences for a given
