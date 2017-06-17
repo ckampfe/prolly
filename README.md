@@ -4,14 +4,18 @@ Probabilistic data structures
 
 ## Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `cms` to your list of dependencies in `mix.exs`:
+This package is [available in Hex](https://hex.pm/packages/prolly), and can be
+installed by adding `prolly` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
-  [{:cms, "~> 0.1.0"}]
+  [{:prolly, "~> 0.1.0"}]
 end
 ```
+
+## Use
+
+For exampels and use, see [the documentation](https://hexdocs.pm/prolly/api-reference.html).
 
 ## Datastructures
 
