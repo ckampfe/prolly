@@ -5,15 +5,15 @@ defmodule Prolly.Mixfile do
     [app: :Prolly,
      version: "0.1.0",
      elixir: "~> 1.4",
+     package: package(),
+     description: "Probabilistic data structures for Elixir",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
      deps: deps()]
   end
 
   def application do
-    # Specify extra applications you'll use from Erlang/Elixir
-    [extra_applications: [:logger],
-     mod: {Prolly.Application, []}]
+    [extra_applications: [:logger]]
   end
 
   defp deps do
@@ -21,5 +21,11 @@ defmodule Prolly.Mixfile do
      {:benchee, "~> 0.9.0", only: :dev},
      {:dialyxir, "~> 0.5", only: :dev, runtime: false},
      {:ex_doc, ">= 0.0.0", only: :dev}]
+  end
+
+  defp package do
+    [maintainers: ["Clark Kampfe"],
+     licenses: ["MIT"],
+     links: %{"Github" => "https://github.com/ckampfe/prolly"}]
   end
 end
