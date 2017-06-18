@@ -156,8 +156,19 @@ defmodule Prolly.BloomFilter do
     %{bloom_filter | filter: new_filter}
   end
 
+
   def update(%__MODULE__{} = bloom_filter, value) do
     update(bloom_filter, to_string(value))
+  end
+
+  @spec union(t, t) :: t
+  def union(bloom_filter1, bloom_filter2) do
+    raise UndefinedFunctionError
+  end
+
+  @spec intersection(t, t) :: t
+  def intersection(bloom_filter1, bloom_filter2) do
+    raise UndefinedFunctionError
   end
 
   defp compute_index(hash_fn, value, k) do

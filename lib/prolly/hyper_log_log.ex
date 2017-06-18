@@ -122,6 +122,11 @@ defmodule Prolly.HyperLogLog do
     correct_estimate(cardinality_estimate, loglog) |> round
   end
 
+  @spec union(t, t) :: t
+  def union(loglog1, loglog2) do
+    raise UndefinedFunctionError
+  end
+
   defp cardinality_estimate(%__MODULE__{registers: registers, alpha_m_squared: alpha_m_squared}) do
     harmonic_sum_of_registers = harmonic_sum_of_registers(registers)
     if harmonic_sum_of_registers == 0 do
