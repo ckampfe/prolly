@@ -51,7 +51,7 @@ defmodule Prolly.HyperLogLog do
       iex> HLL.new(64, fn(value) -> :erlang.phash2(value) end).registers |> Vector.to_list
       Enum.map(1..64, fn _ -> 0 end)
   """
-  @spec new(pos_integer, (term -> integer)) :: t
+  @spec new(pos_integer, (Sting.t -> integer)) :: t
   def new(m, hash_fn) when is_integer(m) and is_function(hash_fn) and m > 0 do
     registers = Vector.new(Enum.map(1..m, fn _ -> 0 end))
     a = compute_alpha(m)
@@ -88,7 +88,7 @@ defmodule Prolly.HyperLogLog do
        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0]
   """
-  @spec update(t, String.t) :: t
+  @spec update(t, String.Chars) :: t
   def update(%__MODULE__{registers: registers, hash_fn: hash_fn, b: b} = loglog, value) when is_binary(value) do
     value_hash_bits = compute_value_hash_bits(hash_fn, value)
     index = compute_index(value_hash_bits, b)
@@ -102,7 +102,6 @@ defmodule Prolly.HyperLogLog do
     %{loglog | registers: new_registers}
   end
 
-  @spec update(t, term) :: t
   def update(%__MODULE__{} = loglog, value) do
     update(loglog, to_string(value))
   end
