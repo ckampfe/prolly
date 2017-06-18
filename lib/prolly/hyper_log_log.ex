@@ -68,16 +68,25 @@ defmodule Prolly.HyperLogLog do
   end
 
   @doc """
-  Update a HyperLogLog wth a `String`
+  Update a HyperLogLog
 
   ## Examples
 
+      # with a String
       iex> require Prolly.HyperLogLog, as: HLL
       iex> hll = HLL.new(64, fn(value) -> :erlang.phash2(value) end)
       iex> HLL.update(hll, "hi").registers |> Vector.to_list
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0,
        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+      # with any term
+      iex> require Prolly.HyperLogLog, as: HLL
+      iex> hll = HLL.new(64, fn(value) -> :erlang.phash2(value) end)
+      iex> HLL.update(hll, 4242).registers |> Vector.to_list
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0]
   """
   @spec update(t, String.t) :: t
   def update(%__MODULE__{registers: registers, hash_fn: hash_fn, b: b} = loglog, value) when is_binary(value) do
@@ -93,18 +102,6 @@ defmodule Prolly.HyperLogLog do
     %{loglog | registers: new_registers}
   end
 
-  @doc """
-  Update a HyperLogLog with any term
-
-  ## Examples
-
-      iex> require Prolly.HyperLogLog, as: HLL
-      iex> hll = HLL.new(64, fn(value) -> :erlang.phash2(value) end)
-      iex> HLL.update(hll, 4242).registers |> Vector.to_list
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0]
-  """
   @spec update(t, term) :: t
   def update(%__MODULE__{} = loglog, value) do
     update(loglog, to_string(value))
