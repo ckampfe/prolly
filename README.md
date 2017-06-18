@@ -11,7 +11,7 @@ installed by adding `prolly` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
-  [{:prolly, "~> 0.1.0"}]
+  [{:prolly, "~> 0.2.0"}]
 end
 ```
 
