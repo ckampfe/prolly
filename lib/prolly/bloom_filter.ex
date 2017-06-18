@@ -17,31 +17,33 @@ defmodule Prolly.BloomFilter do
   It cannot tell you that a value is definitely in a set.
   """
 
-  @type t :: __MODULE__
+  @opaque t :: %__MODULE__{
+    filter: Vector.t,
+    hash_fns: list((String.t -> integer)),
+    m: pos_integer
+  }
 
-  defstruct [filter: nil, hashes: nil]
+  defstruct [filter: nil, hash_fns: nil, m: 1]
 
   @doc """
   Create a Bloom filter.
 
       iex> alias Prolly.BloomFilter
-      iex> BloomFilter.new(20, [:md5, :sha, :sha256]).filter |> Enum.to_list
+      iex> BloomFilter.new(20,
+      ...> [fn(value) -> :crypto.hash(:sha, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:md5, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:sha256, value) |> :crypto.bytes_to_integer() end]).filter
+      ...> |> Enum.to_list
       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-
-      iex> alias Prolly.BloomFilter
-      iex> BloomFilter.new(20, [:md5, :sha, :sha256]).hashes
-      [:md5, :sha, :sha256]
-
-      iex> alias Prolly.BloomFilter
-      iex> BloomFilter.new(20, Enum.into([:md5, :sha, :sha256], MapSet.new)).hashes
-      #MapSet<[:md5, :sha, :sha256]>
   """
-  def new(filter_size, hashes) when is_integer(filter_size) do
-    filter = Vector.new(Stream.iterate(0, &(&1)) |> Enum.take(filter_size))
+  @spec new(pos_integer, list((String.t -> integer))) :: t
+  def new(filter_size, hash_fns) when is_integer(filter_size) do
+    filter = Vector.new(Enum.map(1..filter_size, fn _ -> 0 end))
 
     %__MODULE__{
       filter: filter,
-      hashes: hashes
+      hash_fns: hash_fns,
+      m: filter_size
     }
   end
 
@@ -51,11 +53,13 @@ defmodule Prolly.BloomFilter do
   ## Examples
 
       iex> alias Prolly.BloomFilter
-      iex> BloomFilter.optimal_number_of_hashes(10000, 1000) |> round
+      iex> BloomFilter.optimal_number_of_hashes(10000, 1000)
       7
   """
-  def optimal_number_of_hashes(filter_size, input_size) do
-    (filter_size / input_size) * :math.log(2)
+  @spec optimal_number_of_hashes(pos_integer, pos_integer) :: pos_integer
+  def optimal_number_of_hashes(filter_size, input_size)
+  when is_integer(filter_size) and is_integer(input_size) and filter_size > 0 and input_size > 0 do
+    (filter_size / input_size) * :math.log(2) |> round
   end
 
   @doc """
@@ -67,6 +71,7 @@ defmodule Prolly.BloomFilter do
       iex> BloomFilter.false_positive_rate(10000, 3000, 3) |> (fn(n) -> :erlang.round(n * 100) / 100 end).()
       0.21
   """
+  @spec false_positive_rate(pos_integer, pos_integer, pos_integer) :: float
   def false_positive_rate(filter_size, input_size, number_of_hashes) do
     :math.pow(1 - :math.exp(-number_of_hashes * input_size / filter_size), number_of_hashes)
   end
@@ -77,24 +82,43 @@ defmodule Prolly.BloomFilter do
   ## Examples
 
       iex> alias Prolly.BloomFilter
-      iex> bf = BloomFilter.new(20, [:md5, :sha, :sha256])
+      iex> bf = BloomFilter.new(20,
+      ...> [fn(value) -> :crypto.hash(:sha, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:md5, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:sha256, value) |> :crypto.bytes_to_integer() end])
       iex> bf = BloomFilter.update(bf, "hi")
       iex> BloomFilter.possible_member?(bf, "hi")
       true
 
       iex> alias Prolly.BloomFilter
-      iex> bf = BloomFilter.new(20, [:md5, :sha, :sha256])
+      iex> bf = BloomFilter.new(20,
+      ...> [fn(value) -> :crypto.hash(:sha, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:md5, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:sha256, value) |> :crypto.bytes_to_integer() end])
       iex> bf = BloomFilter.update(bf, "hi")
       iex> BloomFilter.possible_member?(bf, "this is not hi!")
       false
+
+      iex> alias Prolly.BloomFilter
+      iex> bf = BloomFilter.new(20,
+      ...> [fn(value) -> :crypto.hash(:sha, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:md5, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:sha256, value) |> :crypto.bytes_to_integer() end])
+      iex> bf = BloomFilter.update(bf, 7777777)
+      iex> BloomFilter.possible_member?(bf, 7777777)
+      true
   """
-  def possible_member?(%__MODULE__{filter: filter, hashes: hashes}, value) do
-    m = Vector.size(filter)
-    Stream.take_while(hashes, fn(hash) ->
-      filter[compute_index(hash, value, m)] == 1
+  @spec possible_member?(t, String.Chars) :: boolean
+  def possible_member?(%__MODULE__{filter: filter, hash_fns: hash_fns, m: m}, value) when is_binary(value) do
+    Stream.take_while(hash_fns, fn(hash_fn) ->
+      filter[compute_index(hash_fn, value, m)] == 1
     end)
     |> Enum.count
-    |> (fn(ones) -> ones == Enum.count(hashes) end).()
+    |> (fn(ones) -> ones == Enum.count(hash_fns) end).()
+  end
+
+  def possible_member?(%__MODULE__{} = bloom_filter, value) do
+    possible_member?(bloom_filter, to_string(value))
   end
 
   @doc """
@@ -106,27 +130,37 @@ defmodule Prolly.BloomFilter do
   ## Examples
 
       iex> alias Prolly.BloomFilter
-      iex> bf = BloomFilter.new(20, [:md5, :sha, :sha256])
+      iex> bf = BloomFilter.new(20,
+      ...> [fn(value) -> :crypto.hash(:sha, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:md5, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:sha256, value) |> :crypto.bytes_to_integer() end])
       iex> BloomFilter.update(bf, "hi").filter |> Enum.to_list
-      [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-  """
-  def update(%__MODULE__{filter: filter, hashes: hashes} = bloom_filter, value) do
-    string_value = to_string(value)
-    m = Vector.size(filter)
+      [0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]
 
+      iex> alias Prolly.BloomFilter
+      iex> bf = BloomFilter.new(20,
+      ...> [fn(value) -> :crypto.hash(:sha, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:md5, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:sha256, value) |> :crypto.bytes_to_integer() end])
+      iex> BloomFilter.update(bf, 12345).filter |> Enum.to_list
+      [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0]
+  """
+  @spec update(t, String.Chars) :: t
+  def update(%__MODULE__{filter: filter, hash_fns: hash_fns, m: m} = bloom_filter, value) when is_binary(value) do
     new_filter =
-      Enum.reduce(hashes, filter, fn(hash, acc) ->
-        index = compute_index(hash, string_value, m)
+      Enum.reduce(hash_fns, filter, fn(hash_fn, acc) ->
+        index = compute_index(hash_fn, value, m)
         Vector.put(acc, index, 1)
       end)
 
     %{bloom_filter | filter: new_filter}
   end
 
-  defp compute_index(hash, value, m) do
-    :crypto.hash(hash, value)
-    |> :binary.bin_to_list
-    |> Enum.sum
-    |> (fn(n) -> rem(n, m) end).()
+  def update(%__MODULE__{} = bloom_filter, value) do
+    update(bloom_filter, to_string(value))
+  end
+
+  defp compute_index(hash_fn, value, k) do
+    hash_fn.(value) |> (fn(n) -> rem(n, k) end).()
   end
 end
