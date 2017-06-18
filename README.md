@@ -2,6 +2,8 @@
 
 Probabilistic data structures
 
+[![Build Status](https://travis-ci.org/ckampfe/prolly.svg?branch=master)](https://travis-ci.org/ckampfe/prolly)
+
 ## Installation
 
 This package is [available in Hex](https://hex.pm/packages/prolly), and can be
@@ -21,4 +23,4 @@ For exampels and use, see [the documentation](https://hexdocs.pm/prolly/api-refe
 
 - [x] CountMinSketch
 - [x] Bloom filter
-- [ ] HyperLogLog
+- [x] HyperLogLog
