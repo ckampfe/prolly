@@ -13,11 +13,15 @@ defmodule Prolly.CountMinSketch do
   value.
   """
 
-  @type t :: __MODULE__
+  @opaque t :: %__MODULE__{
+    matrix: Vector.t,
+    hash_fns: list((String.t -> integer)),
+    depth: pos_integer
+  }
 
   # storing depth on the struct is an optimization so it doesn't
   # have to be computed for every single update and query
-  defstruct [matrix: nil, hashes: nil, depth: 0]
+  defstruct [matrix: nil, hash_fns: nil, depth: 1]
 
   @doc """
   Create a CountMinSketch
@@ -25,23 +29,24 @@ defmodule Prolly.CountMinSketch do
   ## Examples
 
       iex> require Prolly.CountMinSketch, as: Sketch
-      iex> Sketch.new(3, 5, [:sha, :md5, :sha256]).matrix |> Enum.map(&Vector.to_list(&1))
+      iex> Sketch.new(3, 5,
+      ...> [fn(value) -> :crypto.hash(:sha, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:md5, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:sha256, value) |> :crypto.bytes_to_integer() end]).matrix
+      ...> |> Enum.map(&Vector.to_list(&1))
       [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
-
-      iex> require Prolly.CountMinSketch, as: Sketch
-      iex> Sketch.new(3, 5, [:sha, :md5, :sha256]).hashes
-      [:sha, :md5, :sha256]
   """
-  def new(width, depth, hashes) when is_integer(width) and is_integer(depth)  do
+  @spec new(pos_integer, pos_integer, list((String.t -> integer))) :: t
+  def new(width, depth, hash_fns) when is_integer(width) and is_integer(depth)  do
     matrix =
       Enum.map(1..width, fn(_) ->
-        Vector.new(Stream.iterate(0, &(&1)) |> Enum.take(depth))
+        Vector.new(Enum.map(1..depth, fn _ -> 0 end))
       end)
       |> Vector.new
 
     %__MODULE__{
       matrix: matrix,
-      hashes: hashes,
+      hash_fns: hash_fns,
       depth: depth
     }
   end
@@ -52,27 +57,52 @@ defmodule Prolly.CountMinSketch do
   ## Examples
 
       iex> require Prolly.CountMinSketch, as: Sketch
-      iex> Sketch.new(3, 5, [:sha, :md5, :sha256]) |> Sketch.update("hi") |> Sketch.get_count("hi")
+      iex> Sketch.new(3, 5,
+      ...> [fn(value) -> :crypto.hash(:sha, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:md5, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:sha256, value) |> :crypto.bytes_to_integer() end])
+      ...> |> Sketch.update("hi") |> Sketch.get_count("hi")
       1
 
       iex> require Prolly.CountMinSketch, as: Sketch
-      iex> sketch = Sketch.new(3, 5, [:sha, :md5, :sha256])
+      iex> sketch = Sketch.new(3, 5,
+      ...> [fn(value) -> :crypto.hash(:sha, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:md5, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:sha256, value) |> :crypto.bytes_to_integer() end])
       ...> |> Sketch.update("hi")
       ...> |> Sketch.update("hi")
       ...> |> Sketch.update("hi")
       iex> Sketch.get_count(sketch, "hi")
       3
+
+      iex> require Prolly.CountMinSketch, as: Sketch
+      iex> sketch = Sketch.new(3, 5,
+      ...> [fn(value) -> :crypto.hash(:sha, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:md5, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:sha256, value) |> :crypto.bytes_to_integer() end])
+      ...> |> Sketch.update([77, "list"])
+      ...> |> Sketch.update([77, "list"])
+      ...> |> Sketch.update([77, "list"])
+      ...> |> Sketch.update([77, "list"])
+      ...> |> Sketch.update([77, "list"])
+      iex> Sketch.get_count(sketch, [77, "list"])
+      5
   """
-  def get_count(%__MODULE__{matrix: matrix, hashes: hashes, depth: depth}, value) do
-    hashes
+  @spec get_count(t, String.Chars) :: integer
+  def get_count(%__MODULE__{matrix: matrix, hash_fns: hash_fns, depth: depth}, value) when is_binary(value) do
+    hash_fns
     |> Enum.with_index
-    |> Enum.map(fn({hash, i}) ->
-      [i, compute_index(hash, value, depth)]
+    |> Enum.map(fn({hash_fn, i}) ->
+      [i, compute_index(hash_fn, value, depth)]
     end)
     |> Enum.map(fn(path) ->
       Kernel.get_in(matrix, path)
     end)
     |> Enum.min
+  end
+
+  def get_count(%__MODULE__{} = sketch, value) do
+    get_count(sketch, to_string(value))
   end
 
   @doc """
@@ -81,23 +111,41 @@ defmodule Prolly.CountMinSketch do
   ## Examples
 
       iex> require Prolly.CountMinSketch, as: Sketch
-      iex> sketch = Sketch.new(3, 5, [:sha, :md5, :sha256]) |> Sketch.update("hi")
+      iex> sketch = Sketch.new(3, 5,
+      ...> [fn(value) -> :crypto.hash(:sha, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:md5, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:sha256, value) |> :crypto.bytes_to_integer() end])
+      ...> |> Sketch.update("hi")
       iex> sketch.matrix |> Enum.map(&Vector.to_list(&1))
       [[0, 1, 0, 0, 0], [0, 0, 1, 0, 0], [0, 1, 0, 0, 0]]
+
+      iex> require Prolly.CountMinSketch, as: Sketch
+      iex> sketch = Sketch.new(3, 5,
+      ...> [fn(value) -> :crypto.hash(:sha, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:md5, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:sha256, value) |> :crypto.bytes_to_integer() end])
+      ...> |> Sketch.update(["a", "list", "of", "things"])
+      iex> sketch.matrix |> Enum.map(&Vector.to_list(&1))
+      [[0, 0, 0, 0, 1], [0, 0, 1, 0, 0], [0, 0, 1, 0, 0]]
   """
-  def update(%__MODULE__{matrix: matrix, hashes: hashes, depth: depth} = sketch, value) do
+  @spec update(t, String.Chars) :: t
+  def update(%__MODULE__{matrix: matrix, hash_fns: hash_fns, depth: depth} = sketch, value) when is_binary(value) do
     new_matrix =
-      hashes
+      hash_fns
       |> Enum.with_index
-      |> Enum.reduce(matrix, fn({hash, i}, acc) ->
+      |> Enum.reduce(matrix, fn({hash_fn, i}, acc) ->
         Kernel.update_in(
           acc,
-          [i, compute_index(hash, value, depth)],
+          [i, compute_index(hash_fn, value, depth)],
           &(&1 + 1)
         )
       end)
 
     %{sketch | matrix: new_matrix}
+  end
+
+  def update(%__MODULE__{} = sketch, value) do
+    update(sketch, to_string(value))
   end
 
   @doc """
@@ -106,17 +154,26 @@ defmodule Prolly.CountMinSketch do
   ## Examples
 
       iex> require Prolly.CountMinSketch, as: Sketch
-      iex> sketch1 = Sketch.new(3, 5, [:sha, :md5, :sha256]) |> Sketch.update("hi")
-      iex> sketch2 = Sketch.new(3, 5, [:sha, :md5, :sha256]) |> Sketch.update("hi")
+      iex> sketch1 = Sketch.new(3, 5,
+      ...> [fn(value) -> :crypto.hash(:sha, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:md5, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:sha256, value) |> :crypto.bytes_to_integer() end])
+      ...> |> Sketch.update("hi")
+      iex> sketch2 = Sketch.new(3, 5,
+      ...> [fn(value) -> :crypto.hash(:sha, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:md5, value) |> :crypto.bytes_to_integer() end,
+      ...>  fn(value) -> :crypto.hash(:sha256, value) |> :crypto.bytes_to_integer() end])
+      ...> |> Sketch.update("hi")
       iex> Sketch.union(sketch1, sketch2).matrix |> Enum.map(&Vector.to_list(&1))
       [[0, 2, 0, 0, 0], [0, 0, 2, 0, 0], [0, 2, 0, 0, 0]]
   """
+  @spec union(t, t) :: t
   def union(
-    %__MODULE__{matrix: matrix1, hashes: hashes, depth: depth} = sketch,
-    %__MODULE__{matrix: matrix2}
+    %__MODULE__{matrix: matrix1, hash_fns: hash_fns, depth: depth} = sketch1,
+    %__MODULE__{matrix: matrix2} = _sketch2
   ) do
     paths =
-      for w <- 0..(Enum.count(hashes) - 1),
+      for w <- 0..(Enum.count(hash_fns) - 1),
           d <- 0..(depth - 1), do: [w, d]
 
     new_matrix =
@@ -126,13 +183,10 @@ defmodule Prolly.CountMinSketch do
         end)
       end)
 
-    %{sketch | matrix: new_matrix}
+    %{sketch1 | matrix: new_matrix}
   end
 
-  defp compute_index(hash, value, k) do
-    :crypto.hash(hash, value)
-    |> :binary.bin_to_list
-    |> Enum.sum
-    |> (fn(n) -> rem(n, k) end).()
+  defp compute_index(hash_fn, value, k) do
+    hash_fn.(value) |> (fn(n) -> rem(n, k) end).()
   end
 end
