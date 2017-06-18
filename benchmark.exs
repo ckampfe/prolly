@@ -3,12 +3,15 @@ require Prolly.CountMinSketch, as: Sketch
 require Prolly.HyperLogLog, as: HLL
 
 sizes = [1_000, 10_000, 100_000, 1_000_000]
-hashes = [:md5, :sha, :sha256]
+hash_fns =  [
+  fn(value) -> :crypto.hash(:sha, value) |> :crypto.bytes_to_integer() end,
+  fn(value) -> :crypto.hash(:md5, value) |> :crypto.bytes_to_integer() end,
+  fn(value) -> :crypto.hash(:sha256, value) |> :crypto.bytes_to_integer() end]
 value = "this is an example value to check"
 
 bench = Enum.reduce(sizes, %{}, fn(size, acc) ->
-  sketch = Sketch.new(3, size, hashes)
-  bloom_filter = BloomFilter.new(size, hashes)
+  sketch = Sketch.new(3, size, hash_fns)
+  bloom_filter = BloomFilter.new(size, hash_fns)
 
   hyper_log_log_phash2_16 =
     HLL.new(16, fn(value) -> :erlang.phash2(value) end)
