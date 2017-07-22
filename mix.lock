@@ -1,4 +1,4 @@
-%{"array_vector": {:hex, :array_vector, "0.2.1", "82d7e31ef8a5a2c7aaccbe1d2f4e53d75fd1cac022e7357faf24c25da73ded4f", [:mix], [], "hexpm"},
+%{"array_vector": {:hex, :array_vector, "0.3.0", "3afc0abb82a2e0bfe0ffe54948b78163a4aae013818f86f343e9de85b9d479ca", [:mix], [], "hexpm"},
   "benchee": {:hex, :benchee, "0.9.0", "433d946b0e4755e186fe564568ead4f593b0d15337fcffa95ed7d5b8a6612670", [:mix], [{:deep_merge, "~> 0.1", [hex: :deep_merge, repo: "hexpm", optional: false]}], "hexpm"},
   "deep_merge": {:hex, :deep_merge, "0.1.1", "c27866a7524a337b6a039eeb8dd4f17d458fd40fbbcb8c54661b71a22fffe846", [:mix], [], "hexpm"},
   "dialyxir": {:hex, :dialyxir, "0.5.0", "5bc543f9c28ecd51b99cc1a685a3c2a1a93216990347f259406a910cf048d1d7", [:mix], [], "hexpm"},

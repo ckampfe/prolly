@@ -17,7 +17,7 @@ defmodule Prolly.Mixfile do
   end
 
   defp deps do
-    [{:array_vector, "~> 0.2"},
+    [{:array_vector, "~> 0.3"},
      {:benchee, "~> 0.9.0", only: :dev},
      {:dialyxir, "~> 0.5", only: :dev, runtime: false},
      {:ex_doc, ">= 0.0.0", only: :dev}]
